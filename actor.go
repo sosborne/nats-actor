@@ -16,7 +16,9 @@ type Receive func(msg string, ctx *ActorContext)
 type ActorContext struct {
 	intial    Receive
 	current   Receive
+	sender    *ActorRef
 	receiveMu sync.RWMutex
+	senderMu  sync.Mutex
 }
 
 // Become changes the actor's behavior on the next received message.
@@ -26,11 +28,30 @@ func (ac *ActorContext) Become(receive Receive) {
 	ac.receiveMu.Unlock()
 }
 
+// Gets the actor's ActorRef
+func (ac *ActorContext) Self() *ActorRef {
+	return ac.self
+}
+
+// Get the ActerRef that sent the message.
+func (ac *ActorContext) Sender() *ActorRef {
+	ac.senderMu.Lock()
+	s := ac.sender
+	ac.senderMu.Unlock()
+	return s
+}
+
 func (ac *ActorContext) getCurrentBehavior() Receive {
 	ac.receiveMu.RLock()
 	r := ac.current
 	ac.receiveMu.RUnlock()
 	return r
+}
+
+func (ac *ActorContext) setSender(sender *ActorRef) {
+	ac.senderMu.Lock()
+	ac.sender = sender
+	ac.senderMu.Unlock()
 }
 
 // Immutible and serializable handle to an Actor.
@@ -84,6 +105,12 @@ func (a *Actor) start() {
 		for {
 			select {
 			case msg := <-a.mailboxC:
+				if msg.Reply != "" {
+					a.ctx.setSender(&ActorRef{
+						mailbox: msg.Reply,
+						system:  a.system,
+					})
+				}
 				a.ctx.getCurrentBehavior()(string(msg.Data), a.ctx)
 			case <-a.killC:
 				return

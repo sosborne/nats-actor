@@ -33,12 +33,8 @@ func (as *ActorSystem) ActorOf(name string, receive Receive) *Actor {
 
 func (as *ActorSystem) actorWithParent(name string, receive Receive, parent *Actor) *Actor {
 	a := &Actor{
-		Name:   name,
-		parent: parent,
-		ctx: &ActorContext{
-			intial:  receive,
-			current: receive,
-		},
+		Name:     name,
+		parent:   parent,
 		children: []*Actor{},
 		system:   as,
 		self: &ActorRef{
@@ -47,6 +43,11 @@ func (as *ActorSystem) actorWithParent(name string, receive Receive, parent *Act
 		},
 		mailboxC: make(chan *nats.Msg),
 		killC:    make(chan struct{}),
+	}
+	a.ctx = &ActorContext{
+		intial:  receive,
+		current: receive,
+		self:    a,
 	}
 	a.start()
 	return a
